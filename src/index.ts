@@ -3,13 +3,13 @@ import type { ZodSchema, TypeOf } from "zod";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-type RouteOptions<Body> = {
+type RouteOptions<BodySchema extends ZodSchema> = {
 	req: NextApiRequest;
 	res: NextApiResponse;
-	body: Body;
+	body: TypeOf<BodySchema>;
 };
 
-type Handler<Body extends any> = (options: RouteOptions<Body>) => void;
+type Handler<BodySchema extends ZodSchema> = (options: RouteOptions<BodySchema>) => void;
 
 type RoutesMap = Partial<Record<Method, Route<any>>>;
 
@@ -20,10 +20,7 @@ type RouteInit<BodySchema extends ZodSchema> = {
 class Route<BodySchema extends ZodSchema> {
 	private bodySchema?: BodySchema;
 
-	constructor(
-		private handler: Handler<TypeOf<BodySchema>>,
-		{ bodySchema }: RouteInit<BodySchema>
-	) {
+	constructor(private handler: Handler<BodySchema>, { bodySchema }: RouteInit<BodySchema>) {
 		this.bodySchema = bodySchema;
 	}
 
@@ -43,7 +40,7 @@ class Route<BodySchema extends ZodSchema> {
 			}
 		}
 
-		const options: RouteOptions<$Body> = {
+		const options: RouteOptions<BodySchema> = {
 			req,
 			res,
 			body,
@@ -58,7 +55,7 @@ type RouteBuilderInit<BodySchema extends ZodSchema = any> = {
 };
 
 class RouteBuilder<BodySchema extends ZodSchema = any> {
-	private bodySchema?: BodySchema | undefined;
+	private bodySchema?: BodySchema;
 
 	constructor({ bodySchema }: RouteBuilderInit<BodySchema> = {}) {
 		this.bodySchema = bodySchema;
@@ -68,7 +65,7 @@ class RouteBuilder<BodySchema extends ZodSchema = any> {
 		return new RouteBuilder({ bodySchema: schema });
 	}
 
-	build(handler: Handler<TypeOf<BodySchema>>): Route<TypeOf<BodySchema>> {
+	build(handler: Handler<BodySchema>): Route<BodySchema> {
 		return new Route(handler, { bodySchema: this.bodySchema });
 	}
 }
