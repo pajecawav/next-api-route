@@ -1,30 +1,37 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
-import type { ZodSchema, TypeOf } from "zod";
+import type { ZodSchema, TypeOf, ZodIssue } from "zod";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-type RouteOptions<BodySchema extends ZodSchema> = {
+type RouteOptions<Response, BodySchema extends ZodSchema> = {
 	req: NextApiRequest;
-	res: NextApiResponse;
+	res: NextApiResponse<Response>;
 	body: TypeOf<BodySchema>;
 };
 
-type Handler<BodySchema extends ZodSchema> = (options: RouteOptions<BodySchema>) => void;
+type ErrorResponse = { errors: ZodIssue[] };
 
-type RoutesMap = Partial<Record<Method, Route<any>>>;
+type Handler<Response, BodySchema extends ZodSchema> = (
+	options: RouteOptions<Response, BodySchema>
+) => void;
+
+type RoutesMap = Partial<Record<Method, Route<any, any>>>;
 
 type RouteInit<BodySchema extends ZodSchema> = {
 	bodySchema?: BodySchema;
 };
 
-class Route<BodySchema extends ZodSchema> {
+class Route<Response, BodySchema extends ZodSchema> {
 	private bodySchema?: BodySchema;
 
-	constructor(private handler: Handler<BodySchema>, { bodySchema }: RouteInit<BodySchema>) {
+	constructor(
+		private handler: Handler<Response, BodySchema>,
+		{ bodySchema }: RouteInit<BodySchema>
+	) {
 		this.bodySchema = bodySchema;
 	}
 
-	async handle(req: NextApiRequest, res: NextApiResponse) {
+	async handle(req: NextApiRequest, res: NextApiResponse<Response | ErrorResponse>) {
 		type $Body = TypeOf<BodySchema>;
 
 		let body: $Body = undefined;
@@ -40,7 +47,7 @@ class Route<BodySchema extends ZodSchema> {
 			}
 		}
 
-		const options: RouteOptions<BodySchema> = {
+		const options: RouteOptions<Response, BodySchema> = {
 			req,
 			res,
 			body,
@@ -65,7 +72,7 @@ class RouteBuilder<BodySchema extends ZodSchema = any> {
 		return new RouteBuilder({ bodySchema: schema });
 	}
 
-	build(handler: Handler<BodySchema>): Route<BodySchema> {
+	build<Response = any>(handler: Handler<Response, BodySchema>): Route<Response, BodySchema> {
 		return new Route(handler, { bodySchema: this.bodySchema });
 	}
 }
@@ -93,13 +100,13 @@ export function createRoute(routes: RoutesMap): NextApiHandler {
 }
 
 // TODO: for testing purposes, delete later
-// import { z } from "zod";
-// const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
-// test.build;
-// createRoute({
-// 	GET: route()
-// 		.body(z.object({ foo: z.string(), bar: z.number() }))
-// 		.build(({ req, res, body }) => {
-// 			res.status(200).json({ hello: "delete" });
-// 		}),
-// });
+import { z } from "zod";
+const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
+test.build;
+createRoute({
+	GET: route()
+		.body(z.object({ foo: z.string(), bar: z.number() }))
+		.build(({ req, res, body }) => {
+			res.status(200).json({ hello: "delete" });
+		}),
+});
