@@ -1,7 +1,7 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
 import type { TypeOf, ZodIssue, ZodSchema } from "zod";
 
-type Method = "GET" | "POST" | "PUT" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 type RouteParams<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchema> = {
 	req: NextApiRequest;
@@ -111,7 +111,7 @@ export function createRoute(routes: RoutesMap): NextApiHandler {
 		const handler = routes[req.method as Method];
 
 		if (!handler) {
-			res.status(405).send("Method Not Supported");
+			res.status(405).send("Method Not Allowed");
 			return;
 		}
 
