@@ -1,32 +1,75 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
+import type { ZodSchema, TypeOf } from "zod";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-type RouteOptions = {
+type RouteOptions<Body> = {
 	req: NextApiRequest;
 	res: NextApiResponse;
+	body: Body;
 };
 
-type Handler = (options: RouteOptions) => void;
+type Handler<Body extends any> = (options: RouteOptions<Body>) => void;
 
-type RoutesMap = Partial<Record<Method, Route>>;
+type RoutesMap = Partial<Record<Method, Route<any>>>;
 
-class Route {
-	constructor(private handler: Handler) {}
+type RouteInit<BodySchema extends ZodSchema> = {
+	bodySchema?: BodySchema;
+};
+
+class Route<BodySchema extends ZodSchema> {
+	private bodySchema?: BodySchema;
+
+	constructor(
+		private handler: Handler<TypeOf<BodySchema>>,
+		{ bodySchema }: RouteInit<BodySchema>
+	) {
+		this.bodySchema = bodySchema;
+	}
 
 	async handle(req: NextApiRequest, res: NextApiResponse) {
-		const options: RouteOptions = {
+		type $Body = TypeOf<BodySchema>;
+
+		let body: $Body = undefined;
+		if (this.bodySchema) {
+			const result = this.bodySchema.safeParse(req.body);
+			if (result.success) {
+				body = result.data;
+			} else {
+				// TODO: better error handling
+				const issues = result.error.issues;
+				res.status(400).json({ errors: issues });
+				return;
+			}
+		}
+
+		const options: RouteOptions<$Body> = {
 			req,
 			res,
+			body,
 		};
 
 		this.handler(options);
 	}
 }
 
-class RouteBuilder {
-	build(handler: Handler) {
-		return new Route(handler);
+type RouteBuilderInit<BodySchema extends ZodSchema = any> = {
+	bodySchema?: BodySchema;
+};
+
+class RouteBuilder<BodySchema extends ZodSchema = any> {
+	private bodySchema?: BodySchema | undefined;
+
+	constructor({ bodySchema }: RouteBuilderInit<BodySchema> = {}) {
+		this.bodySchema = bodySchema;
+	}
+
+	body<T extends ZodSchema>(schema: T): RouteBuilder<T> {
+		return new RouteBuilder({ bodySchema: schema });
+	}
+
+	build(handler: Handler<TypeOf<BodySchema>>): Route<TypeOf<BodySchema>> {
+		return new Route(handler, { bodySchema: this.bodySchema });
 	}
 }
 
@@ -35,7 +78,7 @@ export function route(): RouteBuilder {
 }
 
 export function createRoute(routes: RoutesMap): NextApiHandler {
-	return (req: NextApiRequest, res: NextApiResponse) => {
+	return async (req: NextApiRequest, res: NextApiResponse) => {
 		const handler = routes[req.method as Method];
 
 		if (!handler) {
@@ -43,6 +86,23 @@ export function createRoute(routes: RoutesMap): NextApiHandler {
 			return;
 		}
 
-		handler.handle(req, res);
+		try {
+			await handler.handle(req, res);
+		} catch (e) {
+			// TODO: proper error handling
+			res.status(500).send("Internal server error");
+		}
 	};
 }
+
+// TODO: for testing purposes, delete later
+// import { z } from "zod";
+// const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
+// test.build;
+// createRoute({
+// 	GET: route()
+// 		.body(z.object({ foo: z.string(), bar: z.number() }))
+// 		.build(({ req, res, body }) => {
+// 			res.status(200).json({ hello: "delete" });
+// 		}),
+// });
