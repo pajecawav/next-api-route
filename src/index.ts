@@ -42,8 +42,7 @@ class Route<Response, Body, Query extends QueryBase> {
 		// TODO: how to get rid of any?
 		let body: Body = undefined as any;
 		if (this.bodySchema) {
-			// TODO: use async parsing (https://github.com/colinhacks/zod#parseasync)
-			const result = this.bodySchema.safeParse(req.body);
+			const result = await this.bodySchema.safeParseAsync(req.body);
 			if (result.success) {
 				body = result.data satisfies Body;
 			} else {
@@ -56,7 +55,7 @@ class Route<Response, Body, Query extends QueryBase> {
 		// TODO: how to get rid of any?
 		let query: Query = undefined as any;
 		if (this.querySchema) {
-			const result = this.querySchema.safeParse(req.query);
+			const result = await this.querySchema.safeParseAsync(req.query);
 			if (result.success) {
 				query = result.data satisfies Query;
 			} else {
