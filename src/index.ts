@@ -135,15 +135,3 @@ export function createRouter(routes: RoutesMap | ((route: RouteFn) => RoutesMap)
 		}
 	};
 }
-
-// TODO: for testing purposes, delete later
-// const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
-// test.build;
-// const handler = createRouter({
-// 	GET: route()
-// 		.body(z.object({ foo: z.string(), bar: z.number() }))
-// 		.query(z.object({ asd: z.number() }))
-// 		.build<{ hello: string; val: "foo" | "bar" }>(({ req, res, body, query }) => {
-// 			res.status(200).json({ hello: query.asd.toString(), val: "foo" });
-// 		}),
-// });
