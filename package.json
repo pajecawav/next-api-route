@@ -18,6 +18,8 @@
 		"build:cjs": "npx swc ./src/index.ts -o dist/index.cjs.js -C module.type=commonjs",
 		"build:esm": "npx swc ./src/index.ts -o dist/index.esm.js -C module.type=es6 ",
 		"build:tsc": "tsc --project tsconfig.build.json",
+		"test": "vitest run",
+		"test:watch": "vitest watch",
 		"lint": "run-p -l lint:*",
 		"lint:tsc": "tsc --noEmit",
 		"lint:format": "prettier . --check --ignore-path .gitignore",
@@ -32,9 +34,11 @@
 		"husky": "^8.0.0",
 		"lint-staged": "^13.1.0",
 		"next": "^13.0.0",
+		"node-mocks-http": "^1.12.1",
 		"npm-run-all": "^4.1.5",
 		"prettier": "^2.8.1",
 		"typescript": "^4.9.4",
+		"vitest": "^0.25.6",
 		"zod": "^3.19.1"
 	},
 	"peerDependencies": {
