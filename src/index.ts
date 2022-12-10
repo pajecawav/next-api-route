@@ -1,5 +1,6 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
 import type { ZodIssue, ZodSchema } from "zod";
+import { z } from "zod";
 
 const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 
@@ -18,17 +19,15 @@ type RouteParams<Response, Body, Query extends QueryBase> = {
 type ErrorResponse = { errors: ZodIssue[] };
 
 type Handler<Response, Body, Query extends QueryBase> = (
-	options: RouteParams<Response, Body, Query>
+	params: RouteParams<Response, Body, Query>
 ) => void;
 
-type RoutesMap = Partial<Record<Method, Route<any, any, any>>>;
+const anySchema = z.any();
 
 type RouteInit<Body, Query> = {
 	bodySchema?: ZodSchema<Body>;
 	querySchema?: ZodSchema<Query>;
 };
-
-const anySchema = z.any();
 
 class Route<Response, Body, Query extends QueryBase> {
 	private bodySchema: ZodSchema<Body>;
@@ -63,14 +62,14 @@ class Route<Response, Body, Query extends QueryBase> {
 			return;
 		}
 
-		const options: RouteParams<Response, Body, Query> = {
+		const params: RouteParams<Response, Body, Query> = {
 			req,
 			res,
 			body,
 			query,
 		};
 
-		this.handler(options);
+		this.handler(params);
 	}
 }
 
@@ -105,7 +104,15 @@ export function route(): RouteBuilder<any, QueryBase> {
 	return new RouteBuilder();
 }
 
-export function createRoute(routes: RoutesMap): NextApiHandler {
+type RouteFn = typeof route;
+
+type RoutesMap = Partial<Record<Method, Route<any, any, any>>>;
+
+export function createRoute(routes: (route: RouteFn) => RoutesMap): NextApiHandler;
+export function createRoute(routes: RoutesMap): NextApiHandler;
+export function createRoute(routes: RoutesMap | ((route: RouteFn) => RoutesMap)): NextApiHandler {
+	const routesMap = typeof routes === "function" ? routes(route) : routes;
+
 	for (const method of Object.keys(routes)) {
 		if (!allowedMethods.includes(method as any)) {
 			throw new Error(`Unsupported method ${method}`);
@@ -113,7 +120,7 @@ export function createRoute(routes: RoutesMap): NextApiHandler {
 	}
 
 	return async (req: NextApiRequest, res: NextApiResponse) => {
-		const handler = routes[req.method as Method];
+		const handler = routesMap[req.method as Method];
 
 		if (!handler) {
 			res.status(405).send("Method Not Allowed");
@@ -130,14 +137,14 @@ export function createRoute(routes: RoutesMap): NextApiHandler {
 }
 
 // TODO: for testing purposes, delete later
-import { z } from "zod";
-const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
-test.build;
-const handler = createRoute({
-	GET: route()
-		.body(z.object({ foo: z.string(), bar: z.number() }))
-		.query(z.object({ asd: z.number() }))
-		.build<{ hello: string; val: "foo" | "bar" }>(({ req, res, body, query }) => {
-			res.status(200).json({ hello: query.asd.toString(), val: "foo" });
-		}),
-});
+// import { z } from "zod";
+// const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
+// test.build;
+// const handler = createRoute({
+// 	GET: route()
+// 		.body(z.object({ foo: z.string(), bar: z.number() }))
+// 		.query(z.object({ asd: z.number() }))
+// 		.build<{ hello: string; val: "foo" | "bar" }>(({ req, res, body, query }) => {
+// 			res.status(200).json({ hello: query.asd.toString(), val: "foo" });
+// 		}),
+// });
