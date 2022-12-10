@@ -26,43 +26,39 @@ type RouteInit<Body, Query> = {
 	querySchema?: ZodSchema<Query>;
 };
 
+const anySchema = z.any();
+
 class Route<Response, Body, Query extends QueryBase> {
-	private bodySchema?: ZodSchema<Body>;
-	private querySchema?: ZodSchema<Query>;
+	private bodySchema: ZodSchema<Body>;
+	private querySchema: ZodSchema<Query>;
 
 	constructor(
 		private handler: Handler<Response, Body, Query>,
 		{ bodySchema, querySchema }: RouteInit<Body, Query>
 	) {
-		this.bodySchema = bodySchema;
-		this.querySchema = querySchema;
+		this.bodySchema = bodySchema ?? anySchema;
+		this.querySchema = querySchema ?? anySchema;
 	}
 
 	async handle(req: NextApiRequest, res: NextApiResponse<Response | ErrorResponse>) {
-		// TODO: how to get rid of any?
-		let body: Body = undefined as any;
-		if (this.bodySchema) {
-			const result = await this.bodySchema.safeParseAsync(req.body);
-			if (result.success) {
-				body = result.data satisfies Body;
-			} else {
-				// TODO: better error handling
-				res.status(400).json({ errors: result.error.issues });
-				return;
-			}
+		let body: Body;
+		const bodyResult = await this.bodySchema.safeParseAsync(req.body);
+		if (bodyResult.success) {
+			body = bodyResult.data;
+		} else {
+			// TODO: better error handling
+			res.status(400).json({ errors: bodyResult.error.issues });
+			return;
 		}
 
-		// TODO: how to get rid of any?
-		let query: Query = undefined as any;
-		if (this.querySchema) {
-			const result = await this.querySchema.safeParseAsync(req.query);
-			if (result.success) {
-				query = result.data satisfies Query;
-			} else {
-				// TODO: better error handling
-				res.status(400).json({ errors: result.error.issues });
-				return;
-			}
+		let query: Query;
+		const queryResult = await this.querySchema.safeParseAsync(req.query);
+		if (queryResult.success) {
+			query = queryResult.data;
+		} else {
+			// TODO: better error handling
+			res.status(400).json({ errors: queryResult.error.issues });
+			return;
 		}
 
 		const options: RouteParams<Response, Body, Query> = {
