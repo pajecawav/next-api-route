@@ -26,6 +26,26 @@ describe("router", () => {
 		expect(mockPost.res._getData()).toBe("POST handler response");
 	});
 
+	test("accepts callback for providing map of handlers", async () => {
+		const router = createRouter(r => ({
+			GET: r().build(({ res }) => res.send("GET handler response")),
+		}));
+
+		const { req, res } = mockRequestResponse({ method: "GET" });
+		await router(req, res);
+		expect(res.statusCode).toBe(200);
+		expect(res._getData()).toBe("GET handler response");
+	});
+
+	test("throws when unsupported method was provided", async () => {
+		expect(() => {
+			createRouter({
+				// @ts-expect-error
+				FOO: route().build(({ res }) => res.send("ok")),
+			});
+		}).toThrow(/unsupported/i);
+	});
+
 	test("returns 405 if method handler doesn't exist", async () => {
 		const router = createRouter({});
 
@@ -117,7 +137,7 @@ describe("router", () => {
 
 		const router = createRouter({
 			GET: route()
-				.body(schema)
+				.query(schema)
 				.build(({ res, body }) => res.send("ok")),
 		});
 
