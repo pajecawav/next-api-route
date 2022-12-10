@@ -1,47 +1,51 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
-import type { TypeOf, ZodIssue, ZodSchema } from "zod";
+import type { ZodIssue, ZodSchema } from "zod";
 
 type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
-type RouteParams<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchema> = {
+// query is always an object
+type QueryBase = Record<string, any> & {};
+
+type RouteParams<Response, Body, Query extends QueryBase> = {
 	req: NextApiRequest;
 	res: NextApiResponse<Response>;
-	// TODO: `body` and `query` should be `never` if no schema were provided
-	body: TypeOf<BodySchema>;
-	query: TypeOf<QuerySchema>;
+	body: Body;
+	query: Query;
 };
 
 type ErrorResponse = { errors: ZodIssue[] };
 
-type Handler<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchema> = (
-	options: RouteParams<Response, BodySchema, QuerySchema>
+type Handler<Response, Body, Query extends QueryBase> = (
+	options: RouteParams<Response, Body, Query>
 ) => void;
 
 type RoutesMap = Partial<Record<Method, Route<any, any, any>>>;
 
-type RouteInit<BodySchema extends ZodSchema, QuerySchema extends ZodSchema> = {
-	bodySchema?: BodySchema;
-	querySchema?: QuerySchema;
+type RouteInit<Body, Query> = {
+	bodySchema?: ZodSchema<Body>;
+	querySchema?: ZodSchema<Query>;
 };
 
-class Route<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchema> {
-	private bodySchema?: BodySchema;
-	private querySchema?: QuerySchema;
+class Route<Response, Body, Query extends QueryBase> {
+	private bodySchema?: ZodSchema<Body>;
+	private querySchema?: ZodSchema<Query>;
 
 	constructor(
-		private handler: Handler<Response, BodySchema, QuerySchema>,
-		{ bodySchema, querySchema }: RouteInit<BodySchema, QuerySchema>
+		private handler: Handler<Response, Body, Query>,
+		{ bodySchema, querySchema }: RouteInit<Body, Query>
 	) {
 		this.bodySchema = bodySchema;
 		this.querySchema = querySchema;
 	}
 
 	async handle(req: NextApiRequest, res: NextApiResponse<Response | ErrorResponse>) {
-		let body: TypeOf<BodySchema> = undefined;
+		// TODO: how to get rid of any?
+		let body: Body = undefined as any;
 		if (this.bodySchema) {
+			// TODO: use async parsing (https://github.com/colinhacks/zod#parseasync)
 			const result = this.bodySchema.safeParse(req.body);
 			if (result.success) {
-				body = result.data;
+				body = result.data satisfies Body;
 			} else {
 				// TODO: better error handling
 				res.status(400).json({ errors: result.error.issues });
@@ -49,11 +53,12 @@ class Route<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchem
 			}
 		}
 
-		let query: TypeOf<QuerySchema> = undefined;
+		// TODO: how to get rid of any?
+		let query: Query = undefined as any;
 		if (this.querySchema) {
 			const result = this.querySchema.safeParse(req.query);
 			if (result.success) {
-				query = result.data;
+				query = result.data satisfies Query;
 			} else {
 				// TODO: better error handling
 				res.status(400).json({ errors: result.error.issues });
@@ -61,8 +66,7 @@ class Route<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchem
 			}
 		}
 
-		// TODO: isn't typesafe (can assign arbitrary values to body and query)
-		const options: RouteParams<Response, BodySchema, QuerySchema> = {
+		const options: RouteParams<Response, Body, Query> = {
 			req,
 			res,
 			body,
@@ -73,36 +77,34 @@ class Route<Response, BodySchema extends ZodSchema, QuerySchema extends ZodSchem
 	}
 }
 
-type RouteBuilderInit<BodySchema extends ZodSchema, QuerySchema extends ZodSchema> = {
-	bodySchema?: BodySchema;
-	querySchema?: QuerySchema;
+type RouteBuilderInit<Body, Query extends QueryBase> = {
+	bodySchema?: ZodSchema<Body>;
+	querySchema?: ZodSchema<Query>;
 };
 
-class RouteBuilder<BodySchema extends ZodSchema, QuerySchema extends ZodSchema> {
-	private bodySchema?: BodySchema;
-	private querySchema?: QuerySchema;
+class RouteBuilder<Body, Query extends QueryBase> {
+	private bodySchema?: ZodSchema<Body>;
+	private querySchema?: ZodSchema<Query>;
 
-	constructor({ bodySchema, querySchema }: RouteBuilderInit<BodySchema, QuerySchema> = {}) {
+	constructor({ bodySchema, querySchema }: RouteBuilderInit<Body, Query> = {}) {
 		this.bodySchema = bodySchema;
 		this.querySchema = querySchema;
 	}
 
-	body<T extends ZodSchema>(schema: T): RouteBuilder<T, QuerySchema> {
+	body<B>(schema: ZodSchema<B>): RouteBuilder<B, Query> {
 		return new RouteBuilder({ bodySchema: schema, querySchema: this.querySchema });
 	}
 
-	query<T extends ZodSchema>(schema: T): RouteBuilder<BodySchema, T> {
+	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouteBuilder<Body, Q> {
 		return new RouteBuilder({ bodySchema: this.bodySchema, querySchema: schema });
 	}
 
-	build<Response = any>(
-		handler: Handler<Response, BodySchema, QuerySchema>
-	): Route<Response, BodySchema, QuerySchema> {
+	build<Response = any>(handler: Handler<Response, Body, Query>): Route<Response, Body, Query> {
 		return new Route(handler, { bodySchema: this.bodySchema, querySchema: this.querySchema });
 	}
 }
 
-export function route(): RouteBuilder<any, any> {
+export function route(): RouteBuilder<any, QueryBase> {
 	return new RouteBuilder();
 }
 
@@ -128,10 +130,11 @@ export function createRoute(routes: RoutesMap): NextApiHandler {
 import { z } from "zod";
 const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
 test.build;
-createRoute({
+const handler = createRoute({
 	GET: route()
 		.body(z.object({ foo: z.string(), bar: z.number() }))
-		.build(({ req, res, body, query }) => {
-			res.status(200).json({ hello: "delete" });
+		.query(z.object({ asd: z.number() }))
+		.build<{ hello: string; val: "foo" | "bar" }>(({ req, res, body, query }) => {
+			res.status(200).json({ hello: query.asd.toString(), val: "foo" });
 		}),
 });
