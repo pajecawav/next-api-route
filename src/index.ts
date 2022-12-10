@@ -2,7 +2,7 @@ import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
 import type { ZodIssue, ZodSchema } from "zod";
 import { z } from "zod";
 
-const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
+const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"] as const;
 
 export type RequestMethod = typeof allowedMethods[number];
 
