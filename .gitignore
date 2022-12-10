@@ -2,5 +2,6 @@ node_modules
 dist
 .swc
 *.tsbuildinfo
+coverage
 
 demo/
