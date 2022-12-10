@@ -4,32 +4,32 @@ import { z } from "zod";
 
 const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 
-type Method = typeof allowedMethods[number];
+export type RequestMethod = typeof allowedMethods[number];
 
 // query is always an object
 type QueryBase = Record<string, any> & {};
 
-type RouteParams<Response, Body, Query extends QueryBase> = {
+export type RouteParams<Response, Body, Query extends QueryBase> = {
 	req: NextApiRequest;
 	res: NextApiResponse<Response>;
 	body: Body;
 	query: Query;
 };
 
-type ErrorResponse = { errors: ZodIssue[] };
+export type ErrorResponse = { errors: ZodIssue[] };
 
-type Handler<Response, Body, Query extends QueryBase> = (
+export type Handler<Response, Body, Query extends QueryBase> = (
 	params: RouteParams<Response, Body, Query>
 ) => void;
 
 const anySchema = z.any();
 
-type RouteInit<Body, Query> = {
+export type RouteInit<Body, Query> = {
 	bodySchema?: ZodSchema<Body>;
 	querySchema?: ZodSchema<Query>;
 };
 
-class Route<Response, Body, Query extends QueryBase> {
+export class Route<Response, Body, Query extends QueryBase> {
 	private bodySchema: ZodSchema<Body>;
 	private querySchema: ZodSchema<Query>;
 
@@ -73,12 +73,12 @@ class Route<Response, Body, Query extends QueryBase> {
 	}
 }
 
-type RouteBuilderInit<Body, Query extends QueryBase> = {
+export type RouteBuilderInit<Body, Query extends QueryBase> = {
 	bodySchema?: ZodSchema<Body>;
 	querySchema?: ZodSchema<Query>;
 };
 
-class RouteBuilder<Body, Query extends QueryBase> {
+export class RouterBuilder<Body, Query extends QueryBase> {
 	private bodySchema?: ZodSchema<Body>;
 	private querySchema?: ZodSchema<Query>;
 
@@ -87,12 +87,12 @@ class RouteBuilder<Body, Query extends QueryBase> {
 		this.querySchema = querySchema;
 	}
 
-	body<B>(schema: ZodSchema<B>): RouteBuilder<B, Query> {
-		return new RouteBuilder({ bodySchema: schema, querySchema: this.querySchema });
+	body<B>(schema: ZodSchema<B>): RouterBuilder<B, Query> {
+		return new RouterBuilder({ bodySchema: schema, querySchema: this.querySchema });
 	}
 
-	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouteBuilder<Body, Q> {
-		return new RouteBuilder({ bodySchema: this.bodySchema, querySchema: schema });
+	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouterBuilder<Body, Q> {
+		return new RouterBuilder({ bodySchema: this.bodySchema, querySchema: schema });
 	}
 
 	build<Response = any>(handler: Handler<Response, Body, Query>): Route<Response, Body, Query> {
@@ -100,17 +100,17 @@ class RouteBuilder<Body, Query extends QueryBase> {
 	}
 }
 
-export function route(): RouteBuilder<any, QueryBase> {
-	return new RouteBuilder();
+export function route(): RouterBuilder<any, QueryBase> {
+	return new RouterBuilder();
 }
 
 type RouteFn = typeof route;
 
-type RoutesMap = Partial<Record<Method, Route<any, any, any>>>;
+type RoutesMap = Partial<Record<RequestMethod, Route<any, any, any>>>;
 
-export function createRoute(routes: (route: RouteFn) => RoutesMap): NextApiHandler;
-export function createRoute(routes: RoutesMap): NextApiHandler;
-export function createRoute(routes: RoutesMap | ((route: RouteFn) => RoutesMap)): NextApiHandler {
+export function createRouter(routes: (route: RouteFn) => RoutesMap): NextApiHandler;
+export function createRouter(routes: RoutesMap): NextApiHandler;
+export function createRouter(routes: RoutesMap | ((route: RouteFn) => RoutesMap)): NextApiHandler {
 	const routesMap = typeof routes === "function" ? routes(route) : routes;
 
 	for (const method of Object.keys(routes)) {
@@ -120,7 +120,7 @@ export function createRoute(routes: RoutesMap | ((route: RouteFn) => RoutesMap))
 	}
 
 	return async (req: NextApiRequest, res: NextApiResponse) => {
-		const handler = routesMap[req.method as Method];
+		const handler = routesMap[req.method as RequestMethod];
 
 		if (!handler) {
 			res.status(405).send("Method Not Allowed");
@@ -137,10 +137,9 @@ export function createRoute(routes: RoutesMap | ((route: RouteFn) => RoutesMap))
 }
 
 // TODO: for testing purposes, delete later
-// import { z } from "zod";
 // const test = route().body(z.object({ foo: z.string(), bar: z.number() }));
 // test.build;
-// const handler = createRoute({
+// const handler = createRouter({
 // 	GET: route()
 // 		.body(z.object({ foo: z.string(), bar: z.number() }))
 // 		.query(z.object({ asd: z.number() }))
