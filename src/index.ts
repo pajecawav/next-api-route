@@ -1,7 +1,9 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
 import type { ZodIssue, ZodSchema } from "zod";
 
-type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
+
+type Method = typeof allowedMethods[number];
 
 // query is always an object
 type QueryBase = Record<string, any> & {};
@@ -104,6 +106,12 @@ export function route(): RouteBuilder<any, QueryBase> {
 }
 
 export function createRoute(routes: RoutesMap): NextApiHandler {
+	for (const method of Object.keys(routes)) {
+		if (!allowedMethods.includes(method as any)) {
+			throw new Error(`Unsupported method ${method}`);
+		}
+	}
+
 	return async (req: NextApiRequest, res: NextApiResponse) => {
 		const handler = routes[req.method as Method];
 
