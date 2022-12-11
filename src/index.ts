@@ -25,23 +25,26 @@ export type Handler<TResponse, TBody, TQuery extends QueryBase> = (
 const anySchema = z.any();
 
 export type RouteInit<TBody, TQuery> = {
+	middlewares?: Middleware[];
 	bodySchema?: ZodSchema<TBody>;
 	querySchema?: ZodSchema<TQuery>;
 };
 
 export class Route<TResponse, TBody, TQuery extends QueryBase> {
+	private middlewares: Middleware[];
 	private bodySchema: ZodSchema<TBody>;
 	private querySchema: ZodSchema<TQuery>;
 
 	constructor(
 		private handler: Handler<TResponse, TBody, TQuery>,
-		{ bodySchema, querySchema }: RouteInit<TBody, TQuery>
+		{ middlewares, bodySchema, querySchema }: RouteInit<TBody, TQuery>
 	) {
+		this.middlewares = middlewares ?? [];
 		this.bodySchema = bodySchema ?? anySchema;
 		this.querySchema = querySchema ?? anySchema;
 	}
 
-	async handle(req: NextApiRequest, res: NextApiResponse<TResponse | ErrorResponse>) {
+	private async execute(req: NextApiRequest, res: NextApiResponse<TResponse | ErrorResponse>) {
 		let body: TBody;
 		const bodyResult = await this.bodySchema.safeParseAsync(req.body);
 		if (bodyResult.success) {
@@ -70,40 +73,84 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 		};
 
 		const result = await this.handler(params);
-
 		if (typeof result !== "undefined") {
 			res.status(res.statusCode || 200);
 			res.json(result);
 		}
 	}
+
+	async handle(req: NextApiRequest, res: NextApiResponse<TResponse | ErrorResponse>) {
+		const fns = [...this.middlewares, () => this.execute(req, res)];
+
+		let index = 0;
+		const next = async () => {
+			// TODO: check if current middleware was called before to prevent
+			// multiple executions of `next`
+			const fn = fns[index++];
+			if (!fn) return;
+			await fn(req, res, next);
+		};
+
+		await next();
+	}
 }
 
+export type Middleware = (
+	req: NextApiRequest,
+	res: NextApiResponse,
+	next: () => Promise<void>
+) => void;
+
 export type RouteBuilderInit<TBody, TQuery extends QueryBase> = {
+	middlewares?: Middleware[];
 	bodySchema?: ZodSchema<TBody>;
 	querySchema?: ZodSchema<TQuery>;
 };
 
 export class RouterBuilder<TBody, TQuery extends QueryBase> {
+	private middlewares: Middleware[];
 	private bodySchema?: ZodSchema<TBody>;
 	private querySchema?: ZodSchema<TQuery>;
 
-	constructor({ bodySchema, querySchema }: RouteBuilderInit<TBody, TQuery> = {}) {
+	constructor({ bodySchema, querySchema, middlewares }: RouteBuilderInit<TBody, TQuery> = {}) {
+		this.middlewares = middlewares ?? [];
 		this.bodySchema = bodySchema;
 		this.querySchema = querySchema;
 	}
 
+	use<M>(middleware: Middleware): RouterBuilder<TBody, TQuery> {
+		const middlewares = [...this.middlewares, middleware];
+		return new RouterBuilder({
+			middlewares,
+			bodySchema: this.bodySchema,
+			querySchema: this.querySchema,
+		});
+	}
+
 	body<B>(schema: ZodSchema<B>): RouterBuilder<B, TQuery> {
-		return new RouterBuilder({ bodySchema: schema, querySchema: this.querySchema });
+		return new RouterBuilder({
+			middlewares: this.middlewares,
+			bodySchema: schema,
+			querySchema: this.querySchema,
+		});
 	}
 
 	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouterBuilder<TBody, Q> {
-		return new RouterBuilder({ bodySchema: this.bodySchema, querySchema: schema });
+		return new RouterBuilder({
+			middlewares: this.middlewares,
+			bodySchema: this.bodySchema,
+			querySchema: schema,
+		});
 	}
 
 	build<TResponse = any>(
 		handler: Handler<TResponse, TBody, TQuery>
 	): Route<TResponse, TBody, TQuery> {
-		return new Route(handler, { bodySchema: this.bodySchema, querySchema: this.querySchema });
+		return new Route(handler, {
+			middlewares: this.middlewares,
+			bodySchema: this.bodySchema,
+			querySchema: this.querySchema,
+		});
 	}
 }
 
