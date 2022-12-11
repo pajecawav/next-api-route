@@ -75,6 +75,7 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 		const result = await this.handler(params);
 		if (typeof result !== "undefined") {
 			res.status(res.statusCode || 200);
+			// TODO: should string be sent via `res.send`?
 			res.json(result);
 		}
 	}

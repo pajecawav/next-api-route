@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { createMocks, RequestOptions, ResponseOptions } from "node-mocks-http";
 import { describe, expect, test } from "vitest";
 import { TypeOf, z } from "zod";
-import { createRouter, route } from ".";
+import { createRouter, Middleware, route } from ".";
 
 // a wrapper with next types
 function mockRequestResponse(reqOptions?: RequestOptions, resOptions?: ResponseOptions) {
@@ -169,5 +169,26 @@ describe("router", () => {
 
 		expect(res.statusCode).toBe(400);
 		expect(res._getJSONData()).toHaveProperty("errors");
+	});
+
+	test("passes request through middleware", async () => {
+		let middlewareWasCalled = false;
+		const middleware: Middleware = async (req, res, next) => {
+			await next();
+			middlewareWasCalled = true;
+		};
+
+		const router = createRouter({
+			GET: route()
+				.use(middleware)
+				.build(() => "hello"),
+		});
+
+		const { req, res } = mockRequestResponse();
+		await router(req, res);
+
+		expect(middlewareWasCalled).toBe(true);
+		expect(res.statusCode).toBe(200);
+		expect(res._getJSONData()).toBe("hello");
 	});
 });
