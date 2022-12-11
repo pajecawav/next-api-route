@@ -9,40 +9,40 @@ export type RequestMethod = typeof allowedMethods[number];
 // query is always an object
 type QueryBase = Record<string, any> & {};
 
-export type RouteParams<Response, Body, Query extends QueryBase> = {
+export type RouteParams<TResponse, TBody, TQuery extends QueryBase> = {
 	req: NextApiRequest;
-	res: NextApiResponse<Response>;
-	body: Body;
-	query: Query;
+	res: NextApiResponse<TResponse>;
+	body: TBody;
+	query: TQuery;
 };
 
 export type ErrorResponse = { errors: ZodIssue[] };
 
-export type Handler<Response, Body, Query extends QueryBase> = (
-	params: RouteParams<Response, Body, Query>
-) => void | Response | Promise<Response>;
+export type Handler<TResponse, TBody, TQuery extends QueryBase> = (
+	params: RouteParams<TResponse, TBody, TQuery>
+) => void | TResponse | Promise<TResponse>;
 
 const anySchema = z.any();
 
-export type RouteInit<Body, Query> = {
-	bodySchema?: ZodSchema<Body>;
-	querySchema?: ZodSchema<Query>;
+export type RouteInit<TBody, TQuery> = {
+	bodySchema?: ZodSchema<TBody>;
+	querySchema?: ZodSchema<TQuery>;
 };
 
-export class Route<Response, Body, Query extends QueryBase> {
-	private bodySchema: ZodSchema<Body>;
-	private querySchema: ZodSchema<Query>;
+export class Route<TResponse, TBody, TQuery extends QueryBase> {
+	private bodySchema: ZodSchema<TBody>;
+	private querySchema: ZodSchema<TQuery>;
 
 	constructor(
-		private handler: Handler<Response, Body, Query>,
-		{ bodySchema, querySchema }: RouteInit<Body, Query>
+		private handler: Handler<TResponse, TBody, TQuery>,
+		{ bodySchema, querySchema }: RouteInit<TBody, TQuery>
 	) {
 		this.bodySchema = bodySchema ?? anySchema;
 		this.querySchema = querySchema ?? anySchema;
 	}
 
-	async handle(req: NextApiRequest, res: NextApiResponse<Response | ErrorResponse>) {
-		let body: Body;
+	async handle(req: NextApiRequest, res: NextApiResponse<TResponse | ErrorResponse>) {
+		let body: TBody;
 		const bodyResult = await this.bodySchema.safeParseAsync(req.body);
 		if (bodyResult.success) {
 			body = bodyResult.data;
@@ -52,7 +52,7 @@ export class Route<Response, Body, Query extends QueryBase> {
 			return;
 		}
 
-		let query: Query;
+		let query: TQuery;
 		const queryResult = await this.querySchema.safeParseAsync(req.query);
 		if (queryResult.success) {
 			query = queryResult.data;
@@ -62,7 +62,7 @@ export class Route<Response, Body, Query extends QueryBase> {
 			return;
 		}
 
-		const params: RouteParams<Response, Body, Query> = {
+		const params: RouteParams<TResponse, TBody, TQuery> = {
 			req,
 			res,
 			body,
@@ -78,29 +78,31 @@ export class Route<Response, Body, Query extends QueryBase> {
 	}
 }
 
-export type RouteBuilderInit<Body, Query extends QueryBase> = {
-	bodySchema?: ZodSchema<Body>;
-	querySchema?: ZodSchema<Query>;
+export type RouteBuilderInit<TBody, TQuery extends QueryBase> = {
+	bodySchema?: ZodSchema<TBody>;
+	querySchema?: ZodSchema<TQuery>;
 };
 
-export class RouterBuilder<Body, Query extends QueryBase> {
-	private bodySchema?: ZodSchema<Body>;
-	private querySchema?: ZodSchema<Query>;
+export class RouterBuilder<TBody, TQuery extends QueryBase> {
+	private bodySchema?: ZodSchema<TBody>;
+	private querySchema?: ZodSchema<TQuery>;
 
-	constructor({ bodySchema, querySchema }: RouteBuilderInit<Body, Query> = {}) {
+	constructor({ bodySchema, querySchema }: RouteBuilderInit<TBody, TQuery> = {}) {
 		this.bodySchema = bodySchema;
 		this.querySchema = querySchema;
 	}
 
-	body<B>(schema: ZodSchema<B>): RouterBuilder<B, Query> {
+	body<B>(schema: ZodSchema<B>): RouterBuilder<B, TQuery> {
 		return new RouterBuilder({ bodySchema: schema, querySchema: this.querySchema });
 	}
 
-	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouterBuilder<Body, Q> {
+	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouterBuilder<TBody, Q> {
 		return new RouterBuilder({ bodySchema: this.bodySchema, querySchema: schema });
 	}
 
-	build<Response = any>(handler: Handler<Response, Body, Query>): Route<Response, Body, Query> {
+	build<TResponse = any>(
+		handler: Handler<TResponse, TBody, TQuery>
+	): Route<TResponse, TBody, TQuery> {
 		return new Route(handler, { bodySchema: this.bodySchema, querySchema: this.querySchema });
 	}
 }
