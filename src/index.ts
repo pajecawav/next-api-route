@@ -20,7 +20,7 @@ export type ErrorResponse = { errors: ZodIssue[] };
 
 export type Handler<Response, Body, Query extends QueryBase> = (
 	params: RouteParams<Response, Body, Query>
-) => void;
+) => void | Response | Promise<Response>;
 
 const anySchema = z.any();
 
@@ -69,7 +69,12 @@ export class Route<Response, Body, Query extends QueryBase> {
 			query,
 		};
 
-		this.handler(params);
+		const result = await this.handler(params);
+
+		if (typeof result !== "undefined") {
+			res.status(res.statusCode || 200);
+			res.json(result);
+		}
 	}
 }
 

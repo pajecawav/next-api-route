@@ -1,3 +1,4 @@
+import { NextApiRequest, NextApiResponse } from "next";
 import { createMocks, RequestOptions, ResponseOptions } from "node-mocks-http";
 import { describe, expect, test } from "vitest";
 import { TypeOf, z } from "zod";
@@ -5,14 +6,18 @@ import { createRouter, route } from ".";
 
 // a wrapper with next types
 function mockRequestResponse(reqOptions?: RequestOptions, resOptions?: ResponseOptions) {
-	return createMocks(reqOptions, resOptions);
+	return createMocks<NextApiRequest, NextApiResponse>(reqOptions, resOptions);
 }
 
 describe("router", () => {
 	test("calls handlers based on request method", async () => {
 		const router = createRouter({
-			GET: route().build(({ res }) => res.send("GET handler response")),
-			POST: route().build(({ res }) => res.send("POST handler response")),
+			GET: route().build(({ res }) => {
+				res.send("GET handler response");
+			}),
+			POST: route().build(({ res }) => {
+				res.send("POST handler response");
+			}),
 		});
 
 		const mockGet = mockRequestResponse({ method: "GET" });
@@ -28,7 +33,9 @@ describe("router", () => {
 
 	test("accepts callback for providing map of handlers", async () => {
 		const router = createRouter(r => ({
-			GET: r().build(({ res }) => res.send("GET handler response")),
+			GET: r().build(({ res }) => {
+				res.send("GET handler response");
+			}),
 		}));
 
 		const { req, res } = mockRequestResponse({ method: "GET" });
@@ -64,6 +71,20 @@ describe("router", () => {
 		const { req, res } = mockRequestResponse({ method: "GET" });
 		await router(req, res);
 		expect(res.statusCode).toBe(500);
+	});
+
+	test("processes values returned from handler", async () => {
+		const value = { hello: "world", foo: 123 };
+
+		const router = createRouter({
+			GET: route().build(() => value),
+		});
+
+		const { req, res } = mockRequestResponse();
+		await router(req, res);
+
+		expect(res.statusCode).toBe(200);
+		expect(res._getJSONData()).toStrictEqual(value);
 	});
 
 	test("parses body", async () => {
