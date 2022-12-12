@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { createMocks, RequestOptions, ResponseOptions } from "node-mocks-http";
 import { describe, expect, test } from "vitest";
 import { TypeOf, z } from "zod";
-import { createRouter, Middleware, route } from ".";
+import { createRouter, Middleware, RequestMethod, route } from ".";
 
 // a wrapper with next types
 function mockRequestResponse(reqOptions?: RequestOptions, resOptions?: ResponseOptions) {
@@ -194,5 +194,51 @@ describe("router", () => {
 		expect(middlewareWasCalled).toBe(true);
 		expect(res.statusCode).toBe(200);
 		expect(res._getJSONData()).toBe("hello");
+	});
+
+	test("calls custom handler on unsupported method", async () => {
+		let handlerWasCalledWithMethod: RequestMethod | null = null;
+		const router = createRouter(
+			{},
+			{
+				onNotAllowed(method, req, res) {
+					handlerWasCalledWithMethod = method;
+					res.status(500).send("not allowed");
+				},
+			}
+		);
+
+		const { req, res } = mockRequestResponse({ method: "POST" });
+		await router(req, res);
+
+		expect(handlerWasCalledWithMethod).toBe("POST");
+		expect(res.statusCode).toBe(500);
+		expect(res._getData()).toBe("not allowed");
+	});
+
+	test("calls custom error handler", async () => {
+		let handlerWasCalledWithError: any = null;
+		const errorToThrow = new Error("foobar");
+
+		const router = createRouter(
+			{
+				GET: route().build(() => {
+					throw errorToThrow;
+				}),
+			},
+			{
+				onError(error, req, res) {
+					handlerWasCalledWithError = error;
+					res.status(500).send("error occured");
+				},
+			}
+		);
+
+		const { req, res } = mockRequestResponse();
+		await router(req, res);
+
+		expect(handlerWasCalledWithError).toBe(errorToThrow);
+		expect(res.statusCode).toBe(500);
+		expect(res._getData()).toBe("error occured");
 	});
 });
