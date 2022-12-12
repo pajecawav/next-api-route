@@ -1,6 +1,5 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
-import type { ZodIssue, ZodSchema } from "zod";
-import { z } from "zod";
+import type { SafeParseReturnType, ZodIssue } from "zod";
 
 const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"] as const;
 
@@ -14,6 +13,12 @@ export class ValidationError extends Error {
 		this.errors = errors;
 	}
 }
+
+export type ZodSchemaLike<T> = {
+	// we have to use async parsing to support async refinements and transforms
+	// (https://github.com/colinhacks/zod#parseasync)
+	safeParseAsync(obj: unknown): Promise<SafeParseReturnType<T, T>>;
+};
 
 // query is always an object
 type QueryBase = Record<string, any> & {};
@@ -31,18 +36,22 @@ export type Handler<TResponse, TBody, TQuery extends QueryBase> = (
 	params: RouteParams<TResponse, TBody, TQuery>
 ) => void | TResponse | Promise<TResponse>;
 
-const anySchema = z.any();
+const anySchema: ZodSchemaLike<any> = {
+	async safeParseAsync(data) {
+		return { success: true, data };
+	},
+};
 
 export type RouteInit<TBody, TQuery> = {
 	middlewares?: Middleware[];
-	bodySchema?: ZodSchema<TBody>;
-	querySchema?: ZodSchema<TQuery>;
+	bodySchema?: ZodSchemaLike<TBody>;
+	querySchema?: ZodSchemaLike<TQuery>;
 };
 
 export class Route<TResponse, TBody, TQuery extends QueryBase> {
 	private middlewares: Middleware[];
-	private bodySchema: ZodSchema<TBody>;
-	private querySchema: ZodSchema<TQuery>;
+	private bodySchema: ZodSchemaLike<TBody>;
+	private querySchema: ZodSchemaLike<TQuery>;
 
 	constructor(
 		private handler: Handler<TResponse, TBody, TQuery>,
@@ -123,14 +132,14 @@ export type Middleware = (
 
 export type RouteBuilderInit<TBody, TQuery extends QueryBase> = {
 	middlewares?: Middleware[];
-	bodySchema?: ZodSchema<TBody>;
-	querySchema?: ZodSchema<TQuery>;
+	bodySchema?: ZodSchemaLike<TBody>;
+	querySchema?: ZodSchemaLike<TQuery>;
 };
 
 export class RouterBuilder<TBody, TQuery extends QueryBase> {
 	private middlewares: Middleware[];
-	private bodySchema?: ZodSchema<TBody>;
-	private querySchema?: ZodSchema<TQuery>;
+	private bodySchema?: ZodSchemaLike<TBody>;
+	private querySchema?: ZodSchemaLike<TQuery>;
 
 	constructor({ bodySchema, querySchema, middlewares }: RouteBuilderInit<TBody, TQuery> = {}) {
 		this.middlewares = middlewares ?? [];
@@ -147,7 +156,7 @@ export class RouterBuilder<TBody, TQuery extends QueryBase> {
 		});
 	}
 
-	body<B>(schema: ZodSchema<B>): RouterBuilder<B, TQuery> {
+	body<B>(schema: ZodSchemaLike<B>): RouterBuilder<B, TQuery> {
 		return new RouterBuilder({
 			middlewares: this.middlewares,
 			bodySchema: schema,
@@ -155,7 +164,7 @@ export class RouterBuilder<TBody, TQuery extends QueryBase> {
 		});
 	}
 
-	query<Q extends QueryBase>(schema: ZodSchema<Q>): RouterBuilder<TBody, Q> {
+	query<Q extends QueryBase>(schema: ZodSchemaLike<Q>): RouterBuilder<TBody, Q> {
 		return new RouterBuilder({
 			middlewares: this.middlewares,
 			bodySchema: this.bodySchema,
