@@ -126,7 +126,9 @@ describe("router", () => {
 		await router(req, res);
 
 		expect(res.statusCode).toBe(400);
-		expect(res._getJSONData()).toHaveProperty("errors");
+		const json = res._getJSONData();
+		expect(json).toHaveProperty("message");
+		expect(json).toHaveProperty("errors");
 	});
 
 	test("parses query", async () => {
@@ -168,7 +170,9 @@ describe("router", () => {
 		await router(req, res);
 
 		expect(res.statusCode).toBe(400);
-		expect(res._getJSONData()).toHaveProperty("errors");
+		const json = res._getJSONData();
+		expect(json).toHaveProperty("message");
+		expect(json).toHaveProperty("errors");
 	});
 
 	test("passes request through middleware", async () => {

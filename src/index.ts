@@ -6,6 +6,15 @@ const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRA
 
 export type RequestMethod = typeof allowedMethods[number];
 
+export class ValidationError extends Error {
+	errors: ZodIssue[];
+
+	constructor({ message, errors }: { message: string; errors: ZodIssue[] }) {
+		super(message);
+		this.errors = errors;
+	}
+}
+
 // query is always an object
 type QueryBase = Record<string, any> & {};
 
@@ -16,7 +25,7 @@ export type RouteParams<TResponse, TBody, TQuery extends QueryBase> = {
 	query: TQuery;
 };
 
-export type ErrorResponse = { errors: ZodIssue[] };
+export type ValidationErrorResponse = { message: string; errors: ZodIssue[] };
 
 export type Handler<TResponse, TBody, TQuery extends QueryBase> = (
 	params: RouteParams<TResponse, TBody, TQuery>
@@ -44,26 +53,27 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 		this.querySchema = querySchema ?? anySchema;
 	}
 
-	private async execute(req: NextApiRequest, res: NextApiResponse<TResponse | ErrorResponse>) {
-		let body: TBody;
-		const bodyResult = await this.bodySchema.safeParseAsync(req.body);
-		if (bodyResult.success) {
-			body = bodyResult.data;
-		} else {
-			// TODO: better error handling
-			res.status(400).json({ errors: bodyResult.error.issues });
-			return;
+	private async execute(
+		req: NextApiRequest,
+		res: NextApiResponse<TResponse | ValidationErrorResponse>
+	) {
+		const parsedBody = await this.bodySchema.safeParseAsync(req.body);
+		if (!parsedBody.success) {
+			throw new ValidationError({
+				message: "Failed to parse body",
+				errors: parsedBody.error.errors,
+			});
 		}
+		const body: TBody = parsedBody.data;
 
-		let query: TQuery;
-		const queryResult = await this.querySchema.safeParseAsync(req.query);
-		if (queryResult.success) {
-			query = queryResult.data;
-		} else {
-			// TODO: better error handling
-			res.status(400).json({ errors: queryResult.error.issues });
-			return;
+		const parsedQuery = await this.querySchema.safeParseAsync(req.query);
+		if (!parsedQuery.success) {
+			throw new ValidationError({
+				message: "Failed to parse query",
+				errors: parsedQuery.error.errors,
+			});
 		}
+		const query: TQuery = parsedQuery.data;
 
 		const params: RouteParams<TResponse, TBody, TQuery> = {
 			req,
@@ -80,7 +90,7 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 		}
 	}
 
-	async handle(req: NextApiRequest, res: NextApiResponse<TResponse | ErrorResponse>) {
+	async handle(req: NextApiRequest, res: NextApiResponse<TResponse | ValidationErrorResponse>) {
 		const fns = [...this.middlewares, () => this.execute(req, res)];
 
 		let index = 0;
@@ -92,7 +102,16 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 			await fn(req, res, next);
 		};
 
-		await next();
+		try {
+			await next();
+		} catch (e: unknown) {
+			if (e instanceof ValidationError) {
+				res.status(400).json({ message: e.message, errors: e.errors });
+				return;
+			}
+
+			throw e;
+		}
 	}
 }
 
