@@ -134,7 +134,7 @@ export type RouteBuilderInit<TBody, TQuery extends QueryBase> = {
 	querySchema?: ZodSchemaLike<TQuery>;
 };
 
-export class RouterBuilder<TBody, TQuery extends QueryBase> {
+export class RouteBuilder<TBody, TQuery extends QueryBase> {
 	private middlewares: Middleware[];
 	private bodySchema?: ZodSchemaLike<TBody>;
 	private querySchema?: ZodSchemaLike<TQuery>;
@@ -145,25 +145,25 @@ export class RouterBuilder<TBody, TQuery extends QueryBase> {
 		this.querySchema = querySchema;
 	}
 
-	use<M>(middleware: Middleware): RouterBuilder<TBody, TQuery> {
+	use<M>(middleware: Middleware): RouteBuilder<TBody, TQuery> {
 		const middlewares = [...this.middlewares, middleware];
-		return new RouterBuilder({
+		return new RouteBuilder({
 			middlewares,
 			bodySchema: this.bodySchema,
 			querySchema: this.querySchema,
 		});
 	}
 
-	body<B>(schema: ZodSchemaLike<B>): RouterBuilder<B, TQuery> {
-		return new RouterBuilder({
+	body<B>(schema: ZodSchemaLike<B>): RouteBuilder<B, TQuery> {
+		return new RouteBuilder({
 			middlewares: this.middlewares,
 			bodySchema: schema,
 			querySchema: this.querySchema,
 		});
 	}
 
-	query<Q extends QueryBase>(schema: ZodSchemaLike<Q>): RouterBuilder<TBody, Q> {
-		return new RouterBuilder({
+	query<Q extends QueryBase>(schema: ZodSchemaLike<Q>): RouteBuilder<TBody, Q> {
+		return new RouteBuilder({
 			middlewares: this.middlewares,
 			bodySchema: this.bodySchema,
 			querySchema: schema,
@@ -181,8 +181,8 @@ export class RouterBuilder<TBody, TQuery extends QueryBase> {
 	}
 }
 
-export function route(): RouterBuilder<any, QueryBase> {
-	return new RouterBuilder();
+export function route(): RouteBuilder<any, QueryBase> {
+	return new RouteBuilder();
 }
 
 type RouteFn = typeof route;
