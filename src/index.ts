@@ -94,7 +94,6 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 		const result = await this.handler(params);
 		if (typeof result !== "undefined") {
 			res.status(res.statusCode || 200);
-			// TODO: should string be sent via `res.send`?
 			res.json(result);
 		}
 	}
@@ -111,16 +110,7 @@ export class Route<TResponse, TBody, TQuery extends QueryBase> {
 			await fn(req, res, next);
 		};
 
-		try {
-			await next();
-		} catch (e: unknown) {
-			if (e instanceof ValidationError) {
-				res.status(400).json({ message: e.message, errors: e.errors });
-				return;
-			}
-
-			throw e;
-		}
+		await next();
 	}
 }
 
@@ -129,6 +119,14 @@ export type Middleware = (
 	res: NextApiResponse,
 	next: () => Promise<void>
 ) => void;
+
+export function handleValidationError(
+	error: ValidationError,
+	req: NextApiRequest,
+	res: NextApiResponse<ValidationErrorResponse>
+) {
+	res.status(400).json({ message: error.message, errors: error.errors });
+}
 
 export type RouteBuilderInit<TBody, TQuery extends QueryBase> = {
 	middlewares?: Middleware[];
@@ -191,10 +189,43 @@ type RouteFn = typeof route;
 
 type RoutesMap = Partial<Record<RequestMethod, Route<any, any, any>>>;
 
-export function createRouter(routes: (route: RouteFn) => RoutesMap): NextApiHandler;
-export function createRouter(routes: RoutesMap): NextApiHandler;
-export function createRouter(routes: RoutesMap | ((route: RouteFn) => RoutesMap)): NextApiHandler {
+export function defaultOnError(
+	error: unknown,
+	req: NextApiRequest,
+	res: NextApiResponse<ValidationErrorResponse | string>
+) {
+	if (error instanceof ValidationError) {
+		handleValidationError(error, req, res);
+		return;
+	}
+
+	res.status(500).send("Internal server error");
+}
+
+export function defaultOnNotAllowed(
+	method: RequestMethod,
+	req: NextApiRequest,
+	res: NextApiResponse
+) {
+	res.status(405).send("Method Not Allowed");
+}
+
+export type RouterOptions = {
+	onError?: (error: unknown, req: NextApiRequest, res: NextApiResponse) => void;
+	onNotAllowed?: (method: RequestMethod, req: NextApiRequest, res: NextApiResponse) => void;
+};
+
+export function createRouter(
+	routes: (route: RouteFn) => RoutesMap,
+	options?: RouterOptions
+): NextApiHandler;
+export function createRouter(routes: RoutesMap, options?: RouterOptions): NextApiHandler;
+export function createRouter(
+	routes: RoutesMap | ((route: RouteFn) => RoutesMap),
+	options?: RouterOptions
+): NextApiHandler {
 	const routesMap = typeof routes === "function" ? routes(route) : routes;
+	const { onError = defaultOnError, onNotAllowed = defaultOnNotAllowed } = options ?? {};
 
 	for (const method of Object.keys(routes)) {
 		if (!allowedMethods.includes(method as any)) {
@@ -203,18 +234,18 @@ export function createRouter(routes: RoutesMap | ((route: RouteFn) => RoutesMap)
 	}
 
 	return async (req: NextApiRequest, res: NextApiResponse) => {
-		const handler = routesMap[req.method as RequestMethod];
+		const method = req.method as RequestMethod;
+		const handler = routesMap[method];
 
 		if (!handler) {
-			res.status(405).send("Method Not Allowed");
+			onNotAllowed(method, req, res);
 			return;
 		}
 
 		try {
 			await handler.handle(req, res);
 		} catch (e) {
-			// TODO: proper error handling
-			res.status(500).send("Internal server error");
+			onError(e, req, res);
 		}
 	};
 }
