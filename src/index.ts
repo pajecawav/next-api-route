@@ -32,7 +32,7 @@ export type RouteParams<TResponse, TBody, TQuery extends QueryBase> = {
 
 export type ValidationErrorResponse = { message: string; errors: ZodIssue[] };
 
-export type Handler<TResponse, TBody, TQuery extends QueryBase> = (
+export type RouteHandler<TResponse, TBody, TQuery extends QueryBase> = (
 	params: RouteParams<TResponse, TBody, TQuery>
 ) => void | TResponse | Promise<TResponse>;
 
@@ -49,14 +49,16 @@ export type RouteInit<TBody, TQuery> = {
 };
 
 export class Route<TResponse, TBody, TQuery extends QueryBase> {
+	private handler: RouteHandler<TResponse, TBody, TQuery>;
 	private middlewares: Middleware[];
 	private bodySchema: ZodSchemaLike<TBody>;
 	private querySchema: ZodSchemaLike<TQuery>;
 
 	constructor(
-		private handler: Handler<TResponse, TBody, TQuery>,
+		handler: RouteHandler<TResponse, TBody, TQuery>,
 		{ middlewares, bodySchema, querySchema }: RouteInit<TBody, TQuery>
 	) {
+		this.handler = handler;
 		this.middlewares = middlewares ?? [];
 		this.bodySchema = bodySchema ?? anySchema;
 		this.querySchema = querySchema ?? anySchema;
@@ -171,7 +173,7 @@ export class RouteBuilder<TBody, TQuery extends QueryBase> {
 	}
 
 	build<TResponse = any>(
-		handler: Handler<TResponse, TBody, TQuery>
+		handler: RouteHandler<TResponse, TBody, TQuery>
 	): Route<TResponse, TBody, TQuery> {
 		return new Route(handler, {
 			middlewares: this.middlewares,
