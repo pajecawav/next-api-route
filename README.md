@@ -1,4 +1,4 @@
-# next-api-route
+# next-api-route [![npm](https://img.shields.io/npm/v/next-api-route)](https://www.npmjs.com/package/next-api-route)
 
 Small routing library for [API Routes](https://nextjs.org/docs/api-routes/introduction) in [Next.js](https://nextjs.org/)
 
@@ -15,6 +15,7 @@ pnpm add next-api-route
 # Usage
 
 ```ts
+// pages/api/hello.ts
 import { createRouter, route } from "next-api-route";
 
 export default createRouter({
@@ -34,6 +35,7 @@ export default createRouter({
 You can use [zod](https://github.com/colinhacks/zod) to validate `req.body` and `req.query`:
 
 ```ts
+// pages/api/hello.ts
 import { createRouter, route } from "next-api-route";
 import { z } from "zod";
 
@@ -62,6 +64,7 @@ export default createRouter({
 You can add custom middleware to routes with `.use()` method:
 
 ```ts
+// pages/api/hello.ts
 import { createRouter, route } from "next-api-route";
 
 export default createRouter({
@@ -84,6 +87,7 @@ export default createRouter({
 Or you can also create a reusable route builder:
 
 ```ts
+// pages/api/hello.ts
 import { createRouter, route, Middleware } from "next-api-route";
 
 const logger: Middleware = async (req, res, next) => {
@@ -112,6 +116,7 @@ export default createRouter({
 # Custom Error Handlers
 
 ```ts
+// pages/api/hello.ts
 import { createRouter, route } from "next-api-route";
 
 export default createRouter(
