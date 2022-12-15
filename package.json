@@ -12,6 +12,13 @@
 		"dist/*.js.map",
 		"dist/*.d.ts"
 	],
+	"license": "MIT",
+	"keywords": [
+		"next",
+		"api",
+		"middleware",
+		"validation"
+	],
 	"scripts": {
 		"build": "run-p -l build:*",
 		"build:cjs": "npx swc ./src/index.ts -o dist/index.cjs.js -C module.type=commonjs",
