@@ -1,6 +1,6 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["config:base", "group:allNonMajor"],
+	"extends": ["config:base", "group:allNonMajor", ":disablePeerDependencies"],
 	"rangeStrategy": "bump",
 	"timezone": "Europe/Moscow",
 	"schedule": ["before 9am on wednesday and saturday"],
