@@ -29,8 +29,8 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "run-p -l lint:*",
 		"lint:tsc": "tsc --noEmit",
-		"lint:format": "prettier . --check --ignore-path .gitignore",
-		"format": "prettier . --write --ignore-path .gitignore",
+		"lint:format": "prettier . --check",
+		"format": "prettier . --write",
 		"prepare": "husky install",
 		"prepublishOnly": "pnpm build"
 	},
