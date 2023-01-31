@@ -3,7 +3,7 @@ import type { SafeParseReturnType, ZodIssue } from "zod";
 
 const allowedMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"] as const;
 
-export type RequestMethod = typeof allowedMethods[number];
+export type RequestMethod = (typeof allowedMethods)[number];
 
 export class ValidationError extends Error {
 	errors: ZodIssue[];
@@ -201,7 +201,7 @@ export function defaultOnError(
 		return;
 	}
 
-	res.status(500).send("Internal server error");
+	res.status(500).send("Internal Server Error");
 }
 
 export function defaultOnNotAllowed(
@@ -212,20 +212,41 @@ export function defaultOnNotAllowed(
 	res.status(405).send("Method Not Allowed");
 }
 
+export interface RouterHandler<Routes extends RoutesMap> extends NextApiHandler {}
+
+export type RouteData<TResponse, TBody, TQuery> = {
+	response: TResponse;
+	body: TBody;
+	query: TQuery;
+};
+
+export type RouterData<Routes extends RoutesMap> = {
+	[Key in keyof Routes]: Routes[Key] extends Route<infer TResponse, infer TBody, infer TQuery>
+		? RouteData<TResponse, TBody, TQuery>
+		: never;
+};
+
+export type InferRouter<R extends RouterHandler<any>> = R extends RouterHandler<infer Routes>
+	? RouterData<Routes>
+	: never;
+
 export type RouterOptions = {
 	onError?: (error: unknown, req: NextApiRequest, res: NextApiResponse) => void;
 	onNotAllowed?: (method: RequestMethod, req: NextApiRequest, res: NextApiResponse) => void;
 };
 
-export function createRouter(
-	routes: (route: RouteFn) => RoutesMap,
+export function createRouter<Routes extends RoutesMap>(
+	routes: (route: RouteFn) => Routes,
 	options?: RouterOptions
-): NextApiHandler;
-export function createRouter(routes: RoutesMap, options?: RouterOptions): NextApiHandler;
-export function createRouter(
-	routes: RoutesMap | ((route: RouteFn) => RoutesMap),
+): RouterHandler<Routes>;
+export function createRouter<Routes extends RoutesMap>(
+	routes: Routes,
 	options?: RouterOptions
-): NextApiHandler {
+): RouterHandler<Routes>;
+export function createRouter<Routes extends RoutesMap>(
+	routes: Routes | ((route: RouteFn) => Routes),
+	options?: RouterOptions
+): RouterHandler<Routes> {
 	const routesMap = typeof routes === "function" ? routes(route) : routes;
 	const { onError = defaultOnError, onNotAllowed = defaultOnNotAllowed } = options ?? {};
 
@@ -235,7 +256,7 @@ export function createRouter(
 		}
 	}
 
-	return async (req: NextApiRequest, res: NextApiResponse) => {
+	const fn: RouterHandler<Routes> = async (req: NextApiRequest, res: NextApiResponse) => {
 		const method = req.method as RequestMethod;
 		const handler = routesMap[method];
 
@@ -250,4 +271,6 @@ export function createRouter(
 			onError(e, req, res);
 		}
 	};
+
+	return fn;
 }
