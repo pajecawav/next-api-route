@@ -21,8 +21,8 @@
 	],
 	"scripts": {
 		"build": "run-p -l build:*",
-		"build:cjs": "npx swc ./src/index.ts -o dist/index.cjs.js -C module.type=commonjs",
-		"build:esm": "npx swc ./src/index.ts -o dist/index.esm.js -C module.type=es6 ",
+		"build:cjs": "swc ./src/index.ts -o dist/index.cjs.js -C module.type=commonjs",
+		"build:esm": "swc ./src/index.ts -o dist/index.esm.js -C module.type=es6 ",
 		"build:tsc": "tsc --project tsconfig.build.json",
 		"test": "vitest run",
 		"test:watch": "vitest watch",
