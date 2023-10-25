@@ -41,7 +41,7 @@
 		"@vitest/coverage-c8": "^0.32.4",
 		"husky": "^8.0.3",
 		"lint-staged": "^13.2.3",
-		"next": "^13.4.8",
+		"next": "^13.5.0",
 		"node-mocks-http": "^1.12.2",
 		"npm-run-all": "^4.1.5",
 		"prettier": "^2.8.8",
